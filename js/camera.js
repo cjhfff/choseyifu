@@ -33,6 +33,20 @@ class CameraManager {
         // 保存衣服按钮
         this.saveClothBtn.addEventListener('click', () => this.saveCloth());
         
+        // 快速保存按钮
+        const quickSaveBtn = document.getElementById('quick-save-btn');
+        if (quickSaveBtn) {
+            quickSaveBtn.addEventListener('click', () => this.quickSave());
+        }
+        
+        // 从相册选择按钮
+        const uploadBtn = document.getElementById('upload-cloth-btn');
+        const fileInput = document.getElementById('file-input');
+        if (uploadBtn && fileInput) {
+            uploadBtn.addEventListener('click', () => fileInput.click());
+            fileInput.addEventListener('change', (e) => this.handleFileSelect(e));
+        }
+        
         // 点击模态框外部关闭
         this.cameraModal.addEventListener('click', (e) => {
             if (e.target === this.cameraModal) {
@@ -135,6 +149,71 @@ class CameraManager {
         this.capturedImage = null;
     }
 
+    // 处理文件选择
+    handleFileSelect(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+        
+        // 验证文件类型
+        if (!file.type.startsWith('image/')) {
+            alert('请选择图片文件');
+            return;
+        }
+        
+        // 读取文件
+        const reader = new FileReader();
+        reader.onload = (e) => {
+            this.capturedImage = e.target.result;
+            // 打开模态框并显示预览
+            this.cameraModal.classList.add('active');
+            this.showPreview();
+        };
+        reader.readAsDataURL(file);
+        
+        // 清空输入，以便下次选择相同文件时也能触发
+        event.target.value = '';
+    }
+    
+    // 快速保存（只需要名称和分类）
+    quickSave() {
+        if (!this.capturedImage) {
+            alert('请先拍摄照片');
+            return;
+        }
+        
+        const name = document.getElementById('cloth-name').value.trim();
+        const category = document.getElementById('cloth-category').value;
+        
+        if (!name) {
+            alert('请输入衣服名称');
+            return;
+        }
+        
+        // 创建衣服对象（使用默认值）
+        const cloth = {
+            id: this.generateId(),
+            name: name,
+            category: category,
+            color: '未设置',
+            season: 'all',
+            image: this.capturedImage,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString()
+        };
+        
+        if (storage.addCloth(cloth)) {
+            document.dispatchEvent(new CustomEvent('clothAdded', { detail: cloth }));
+            this.closeCamera();
+            this.resetForm();
+            // 震动反馈
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
+        } else {
+            alert('保存失败，请重试');
+        }
+    }
+    
     // 保存衣服
     saveCloth() {
         if (!this.capturedImage) {
@@ -177,7 +256,10 @@ class CameraManager {
             // 重置表单
             this.resetForm();
             
-            alert('衣服添加成功！');
+            // 震动反馈
+            if (navigator.vibrate) {
+                navigator.vibrate(50);
+            }
         } else {
             alert('保存失败，请重试');
         }

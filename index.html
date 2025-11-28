@@ -13,7 +13,8 @@
         <nav class="navbar">
             <h1 class="app-title">穿搭助手</h1>
             <div class="nav-actions">
-                <button id="add-cloth-btn" class="btn-primary">添加衣服</button>
+                <button id="add-cloth-btn" class="btn-primary">📷 拍照</button>
+                <button id="upload-cloth-btn" class="btn-primary">📁 相册</button>
             </div>
         </nav>
 
@@ -160,11 +161,28 @@
                             <option value="all">四季</option>
                         </select>
                     </div>
-                    <button id="save-cloth-btn" class="btn-primary">保存衣服</button>
+                    <div class="form-actions">
+                        <button id="save-cloth-btn" class="btn-primary">💾 保存衣服</button>
+                        <button id="quick-save-btn" class="btn-secondary">⚡ 快速保存</button>
+                    </div>
                 </div>
             </div>
         </div>
     </div>
+
+    <!-- 图片查看器模态框 -->
+    <div id="image-viewer-modal" class="modal">
+        <div class="image-viewer-content">
+            <button class="close-btn" id="close-viewer">&times;</button>
+            <img id="viewer-image" src="" alt="查看图片">
+            <div class="viewer-actions">
+                <button id="delete-cloth-btn" class="btn-danger">🗑️ 删除</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 隐藏的文件上传输入 -->
+    <input type="file" id="file-input" accept="image/*" style="display: none;">
 
     <!-- JavaScript 文件 -->
     <script src="js/storage.js"></script>

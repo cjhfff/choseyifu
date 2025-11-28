@@ -90,9 +90,106 @@ class ClosetManager {
     addClothCardEventListeners() {
         const clothCards = document.querySelectorAll('.cloth-card');
         clothCards.forEach(card => {
-            card.addEventListener('click', (e) => {
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchEndX = 0;
+            let touchEndY = 0;
+            let touchStartTime = 0;
+            let lastTapTime = 0;
+            let isSwiping = false;
+            
+            // 触摸开始
+            card.addEventListener('touchstart', (e) => {
+                touchStartX = e.touches[0].clientX;
+                touchStartY = e.touches[0].clientY;
+                touchStartTime = Date.now();
+                isSwiping = false;
+            });
+            
+            // 触摸移动
+            card.addEventListener('touchmove', (e) => {
+                if (!touchStartX) return;
+                
+                const touchX = e.touches[0].clientX;
+                const touchY = e.touches[0].clientY;
+                const deltaX = touchX - touchStartX;
+                const deltaY = touchY - touchStartY;
+                
+                // 只处理横向滑动
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 10) {
+                    isSwiping = true;
+                    e.preventDefault();
+                    card.classList.add('swiping');
+                    
+                    // 只允许左滑
+                    if (deltaX < 0 && deltaX > -100) {
+                        card.style.transform = `translateX(${deltaX}px)`;
+                    }
+                }
+            });
+            
+            // 触摸结束
+            card.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].clientX;
+                touchEndY = e.changedTouches[0].clientY;
+                const touchDuration = Date.now() - touchStartTime;
+                const deltaX = touchEndX - touchStartX;
+                
+                card.classList.remove('swiping');
+                
+                if (isSwiping) {
+                    // 滑动删除逻辑
+                    if (deltaX < -60) {
+                        card.classList.add('swipe-left');
+                        // 显示删除按钮
+                        setTimeout(() => {
+                            if (confirm('确定要删除这件衣服吗？')) {
+                                const clothId = card.dataset.clothId;
+                                this.deleteCloth(clothId);
+                                // 震动反馈
+                                if (navigator.vibrate) {
+                                    navigator.vibrate(50);
+                                }
+                            } else {
+                                card.classList.remove('swipe-left');
+                                card.style.transform = '';
+                            }
+                        }, 200);
+                    } else {
+                        // 恢复位置
+                        card.style.transform = '';
+                    }
+                } else if (touchDuration < 300) {
+                    // 检测双击
+                    const currentTime = Date.now();
+                    const tapGap = currentTime - lastTapTime;
+                    
+                    if (tapGap < 300 && tapGap > 0) {
+                        // 双击 - 查看大图
+                        const clothId = card.dataset.clothId;
+                        this.viewClothImage(clothId);
+                        // 震动反馈
+                        if (navigator.vibrate) {
+                            navigator.vibrate(30);
+                        }
+                    } else {
+                        // 单击 - 选择衣服
+                        const clothId = card.dataset.clothId;
+                        this.selectCloth(clothId);
+                    }
+                    
+                    lastTapTime = currentTime;
+                }
+                
+                // 重置
+                touchStartX = 0;
+                touchStartY = 0;
+            });
+            
+            // PC端双击支持
+            card.addEventListener('dblclick', (e) => {
                 const clothId = e.currentTarget.dataset.clothId;
-                this.selectCloth(clothId);
+                this.viewClothImage(clothId);
             });
         });
     }
@@ -129,13 +226,51 @@ class ClosetManager {
             : this.clothes.filter(cloth => cloth.category === this.currentCategory);
     }
 
+    // 查看衣服图片
+    viewClothImage(clothId) {
+        const cloth = storage.getClothById(clothId);
+        if (!cloth) return;
+        
+        const modal = document.getElementById('image-viewer-modal');
+        const viewerImage = document.getElementById('viewer-image');
+        const deleteBtn = document.getElementById('delete-cloth-btn');
+        
+        // 设置图片
+        viewerImage.src = cloth.image;
+        modal.classList.add('active');
+        
+        // 删除按钮事件
+        const deleteHandler = () => {
+            if (this.deleteCloth(clothId)) {
+                modal.classList.remove('active');
+            }
+            deleteBtn.removeEventListener('click', deleteHandler);
+        };
+        deleteBtn.addEventListener('click', deleteHandler);
+        
+        // 关闭按钮
+        const closeBtn = document.getElementById('close-viewer');
+        const closeHandler = () => {
+            modal.classList.remove('active');
+            closeBtn.removeEventListener('click', closeHandler);
+        };
+        closeBtn.addEventListener('click', closeHandler);
+        
+        // 点击背景关闭
+        const bgCloseHandler = (e) => {
+            if (e.target === modal) {
+                modal.classList.remove('active');
+                modal.removeEventListener('click', bgCloseHandler);
+            }
+        };
+        modal.addEventListener('click', bgCloseHandler);
+    }
+    
     // 删除衣服
     deleteCloth(clothId) {
-        if (confirm('确定要删除这件衣服吗？')) {
-            if (storage.deleteCloth(clothId)) {
-                document.dispatchEvent(new CustomEvent('clothDeleted', { detail: { clothId: clothId } }));
-                return true;
-            }
+        if (storage.deleteCloth(clothId)) {
+            document.dispatchEvent(new CustomEvent('clothDeleted', { detail: { clothId: clothId } }));
+            return true;
         }
         return false;
     }

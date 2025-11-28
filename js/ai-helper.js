@@ -288,8 +288,46 @@ class AIHelper {
         return occasions.length > 0 ? occasions : ['日常通勤'];
     }
 
-    // 生成 AI 分析报告
+    // 生成 AI 分析报告（使用真实 AI API）
     async analyzeClothing(imageDataUrl) {
+        console.log('🤖 正在请求 AI 分析...');
+
+        try {
+            // 调用我们自己的后端 API
+            const response = await fetch('/api/analyze', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    image: imageDataUrl
+                })
+            });
+
+            if (!response.ok) {
+                throw new Error(`API 响应失败: ${response.status}`);
+            }
+
+            const aiResult = await response.json();
+            console.log('✅ AI 分析完成:', aiResult);
+            
+            // 验证返回数据格式
+            if (aiResult.error) {
+                throw new Error(aiResult.error);
+            }
+            
+            return aiResult;
+
+        } catch (error) {
+            console.warn('❌ AI API 调用失败，转为本地规则判断:', error.message);
+            // 如果 AI 挂了或者没网，自动降级使用本地算法
+            return await this.analyzeClothingLocal(imageDataUrl);
+        }
+    }
+    
+    // 本地降级分析方法
+    async analyzeClothingLocal(imageDataUrl) {
+        console.log('💡 使用本地算法分析...');
         try {
             // 提取颜色
             const colorInfo = await this.extractDominantColor(imageDataUrl);
@@ -309,6 +347,8 @@ class AIHelper {
             // 搭配建议
             const matchingSuggestion = this.getColorMatchingSuggestion(colorInfo.rgb);
             
+            console.log('✅ 本地分析完成');
+            
             return {
                 color: colorInfo.name,
                 colorHex: colorInfo.hex,
@@ -324,7 +364,7 @@ class AIHelper {
                 }
             };
         } catch (error) {
-            console.error('AI 分析失败:', error);
+            console.error('本地分析也失败了:', error);
             return null;
         }
     }

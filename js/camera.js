@@ -109,7 +109,7 @@ class CameraManager {
     }
 
     // 拍照
-    capturePhoto() {
+    async capturePhoto() {
         try {
             // 设置canvas尺寸与视频一致
             this.canvas.width = this.video.videoWidth;
@@ -118,8 +118,11 @@ class CameraManager {
             // 绘制视频帧到canvas
             this.ctx.drawImage(this.video, 0, 0, this.canvas.width, this.canvas.height);
             
-            // 将canvas转换为图片数据URL
-            this.capturedImage = this.canvas.toDataURL('image/jpeg', 0.8);
+            // 将canvas转换为图片数据URL（初始质量）
+            const originalImage = this.canvas.toDataURL('image/jpeg', 0.8);
+            
+            // 压缩图片以节省存储空间
+            this.capturedImage = await this.compressImage(originalImage);
             
             // 显示预览
             this.showPreview();
@@ -131,7 +134,7 @@ class CameraManager {
     }
 
     // 显示预览
-    showPreview() {
+    async showPreview() {
         // 隐藏视频，显示预览和表单
         this.video.style.display = 'none';
         this.cameraPreview.style.display = 'block';
@@ -141,8 +144,85 @@ class CameraManager {
         
         // 设置预览图片
         this.previewImage.src = this.capturedImage;
+        
+        // AI 智能分析
+        await this.runAIAnalysis();
     }
 
+    // AI 智能分析
+    async runAIAnalysis() {
+        try {
+            // 显示加载提示
+            const nameInput = document.getElementById('cloth-name');
+            const originalPlaceholder = nameInput.placeholder;
+            nameInput.placeholder = '🤖 AI 分析中...';
+            
+            // 调用 AI 分析
+            const analysis = await aiHelper.analyzeClothing(this.capturedImage);
+            
+            if (analysis) {
+                // 自动填充颜色
+                const colorInput = document.getElementById('cloth-color');
+                if (!colorInput.value) {
+                    colorInput.value = analysis.color;
+                    colorInput.style.borderColor = analysis.colorHex;
+                }
+                
+                // 自动选择分类
+                const categorySelect = document.getElementById('cloth-category');
+                if (analysis.confidence > 0.6) {
+                    categorySelect.value = analysis.category;
+                }
+                
+                // 自动选择季节
+                const seasonSelect = document.getElementById('cloth-season');
+                seasonSelect.value = analysis.suggestedSeason;
+                
+                // 显示 AI 建议
+                nameInput.placeholder = `建议：${analysis.color}${this.getCategoryName(analysis.category)}`;
+                
+                // 显示搭配建议（在控制台）
+                console.log('🤖 AI 分析结果：', {
+                    '识别颜色': analysis.color,
+                    '识别类型': this.getCategoryName(analysis.category),
+                    '置信度': `${(analysis.confidence * 100).toFixed(0)}%`,
+                    '建议季节': aiHelper.getSeasonName(analysis.suggestedSeason),
+                    '适合场合': analysis.occasions.join('、'),
+                    '搭配建议': analysis.matching.tip
+                });
+                
+                // 如果有搭配建议，显示提示
+                if (analysis.matching.safe.length > 0) {
+                    setTimeout(() => {
+                        const tip = `🎨 搭配建议：${analysis.matching.tip}\n` +
+                                  `安全色：${analysis.matching.safe.join('、')}`;
+                        console.info(tip);
+                    }, 500);
+                }
+                
+                // 震动反馈
+                if (navigator.vibrate) {
+                    navigator.vibrate([30, 50, 30]);
+                }
+            } else {
+                nameInput.placeholder = originalPlaceholder;
+            }
+        } catch (error) {
+            console.error('AI 分析失败:', error);
+        }
+    }
+    
+    // 获取分类中文名称
+    getCategoryName(category) {
+        const names = {
+            top: '上衣',
+            pants: '裤子',
+            shoes: '鞋子',
+            accessory: '配饰'
+        };
+        return names[category] || '衣服';
+    }
+    
     // 重拍
     retakePhoto() {
         this.resetCameraUI();
@@ -150,7 +230,7 @@ class CameraManager {
     }
 
     // 处理文件选择
-    handleFileSelect(event) {
+    async handleFileSelect(event) {
         const file = event.target.files[0];
         if (!file) return;
         
@@ -160,10 +240,18 @@ class CameraManager {
             return;
         }
         
+        // 检查文件大小
+        const fileSizeMB = (file.size / 1024 / 1024).toFixed(2);
+        if (file.size > 10 * 1024 * 1024) {
+            alert(`图片太大了（${fileSizeMB}MB），请选择小于10MB的图片`);
+            return;
+        }
+        
         // 读取文件
         const reader = new FileReader();
-        reader.onload = (e) => {
-            this.capturedImage = e.target.result;
+        reader.onload = async (e) => {
+            // 压缩图片
+            this.capturedImage = await this.compressImage(e.target.result);
             // 打开模态框并显示预览
             this.cameraModal.classList.add('active');
             this.showPreview();
@@ -175,7 +263,7 @@ class CameraManager {
     }
     
     // 快速保存（只需要名称和分类）
-    quickSave() {
+    async quickSave() {
         if (!this.capturedImage) {
             alert('请先拍摄照片');
             return;
@@ -201,7 +289,7 @@ class CameraManager {
             updatedAt: new Date().toISOString()
         };
         
-        if (storage.addCloth(cloth)) {
+        if (await storage.addCloth(cloth)) {
             document.dispatchEvent(new CustomEvent('clothAdded', { detail: cloth }));
             this.closeCamera();
             this.resetForm();
@@ -220,6 +308,9 @@ class CameraManager {
             alert('请先拍摄照片');
             return;
         }
+        
+        // 检查存储空间
+        this.checkStorageSpace();
         
         // 获取表单数据
         const name = document.getElementById('cloth-name').value.trim();
@@ -246,7 +337,7 @@ class CameraManager {
         };
         
         // 保存到本地存储
-        if (storage.addCloth(cloth)) {
+        if (await storage.addCloth(cloth)) {
             // 通知应用更新界面
             document.dispatchEvent(new CustomEvent('clothAdded', { detail: cloth }));
             
@@ -278,8 +369,8 @@ class CameraManager {
         return Date.now().toString(36) + Math.random().toString(36).substr(2);
     }
 
-    // 压缩图片
-    compressImage(imageDataUrl, maxWidth = 800, quality = 0.8) {
+    // 压缩图片（优化版）
+    async compressImage(imageDataUrl, maxWidth = 600, quality = 0.7) {
         return new Promise((resolve) => {
             const img = new Image();
             img.src = imageDataUrl;
@@ -289,9 +380,11 @@ class CameraManager {
                 let width = img.width;
                 let height = img.height;
                 
-                if (width > maxWidth) {
-                    height = (height * maxWidth) / width;
-                    width = maxWidth;
+                // 根据图片尺寸动态调整压缩参数
+                if (width > maxWidth || height > maxWidth) {
+                    const ratio = Math.min(maxWidth / width, maxWidth / height);
+                    width = width * ratio;
+                    height = height * ratio;
                 }
                 
                 // 创建临时canvas
@@ -300,14 +393,37 @@ class CameraManager {
                 tempCanvas.height = height;
                 const tempCtx = tempCanvas.getContext('2d');
                 
+                // 使用更好的图片平滑算法
+                tempCtx.imageSmoothingEnabled = true;
+                tempCtx.imageSmoothingQuality = 'high';
+                
                 // 绘制压缩后的图片
                 tempCtx.drawImage(img, 0, 0, width, height);
                 
-                // 转换为数据URL
+                // 转换为数据URL，使用更低的质量以节省空间
                 const compressedDataUrl = tempCanvas.toDataURL('image/jpeg', quality);
                 resolve(compressedDataUrl);
             };
         });
+    }
+    
+    // 检查存储空间
+    checkStorageSpace() {
+        try {
+            const used = new Blob(Object.values(localStorage)).size;
+            const limit = 5 * 1024 * 1024; // 5MB
+            const usedMB = (used / 1024 / 1024).toFixed(2);
+            const percentage = ((used / limit) * 100).toFixed(1);
+            
+            if (percentage > 80) {
+                alert(`⚠️ 存储空间即将用完！\n已使用: ${usedMB}MB (${percentage}%)\n建议删除一些不常穿的衣服`);
+            }
+            
+            return { used, limit, percentage };
+        } catch (e) {
+            console.error('无法检查存储空间:', e);
+            return null;
+        }
     }
 }
 

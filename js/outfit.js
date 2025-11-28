@@ -59,8 +59,10 @@ class OutfitManager {
     }
 
     // 加载穿搭数据
-    loadOutfits() {
-        this.outfits = storage.getOutfits();
+    async loadOutfits() {
+        this.outfits = await storage.getOutfits();
+        // 缓存所有衣服数据供渲染使用
+        this.getAllClothesCache = await storage.getClothes();
         this.renderOutfits();
     }
 
@@ -80,7 +82,7 @@ class OutfitManager {
         this.outfitsGrid.innerHTML = this.outfits.map(outfit => this.createOutfitCard(outfit)).join('');
     }
 
-    // 创建穿搭卡片HTML
+    // 创建穿搭卡片HTML（同步版本，使用缓存数据）
     createOutfitCard(outfit) {
         const categoryNames = {
             top: '上衣',
@@ -91,6 +93,9 @@ class OutfitManager {
         
         const formattedDate = new Date(outfit.createdAt).toLocaleDateString('zh-CN');
         
+        // 使用已加载的衣服数据
+        const clothes = this.getAllClothesCache || [];
+        
         return `
             <div class="outfit-card">
                 <div class="outfit-card-header">
@@ -100,7 +105,7 @@ class OutfitManager {
                 <div class="outfit-items">
                     ${Object.entries(outfit.items).map(([category, clothId]) => {
                         if (!clothId) return '';
-                        const cloth = storage.getClothById(clothId);
+                        const cloth = clothes.find(c => c.id === clothId);
                         if (!cloth) return '';
                         return `
                             <div class="outfit-item">
@@ -115,8 +120,8 @@ class OutfitManager {
     }
 
     // 渲染选择器
-    renderSelector() {
-        const clothes = storage.getClothesByCategory(this.currentSelectorCategory);
+    async renderSelector() {
+        const clothes = await storage.getClothesByCategory(this.currentSelectorCategory);
         
         if (clothes.length === 0) {
             this.selectorGrid.innerHTML = `
@@ -174,8 +179,8 @@ class OutfitManager {
     }
 
     // 添加衣服到穿搭
-    addClothToOutfit(clothId) {
-        const cloth = storage.getClothById(clothId);
+    async addClothToOutfit(clothId) {
+        const cloth = await storage.getClothById(clothId);
         if (!cloth) return;
         
         this.currentOutfit[cloth.category] = clothId;
@@ -183,13 +188,13 @@ class OutfitManager {
     }
 
     // 更新穿搭显示
-    updateOutfitDisplay() {
-        this.outfitSlots.forEach(slot => {
+    async updateOutfitDisplay() {
+        for (const slot of this.outfitSlots) {
             const category = slot.dataset.slot;
             const clothId = this.currentOutfit[category];
             
             if (clothId) {
-                const cloth = storage.getClothById(clothId);
+                const cloth = await storage.getClothById(clothId);
                 if (cloth) {
                     slot.innerHTML = `
                         <img src="${cloth.image}" alt="${cloth.name}" class="slot-cloth">
@@ -201,7 +206,7 @@ class OutfitManager {
                 slot.innerHTML = `<span class="slot-placeholder">+ 选择${this.getCategoryName(category)}</span>`;
                 slot.classList.remove('has-cloth');
             }
-        });
+        }
     }
 
     // 从穿搭中移除衣服
@@ -221,12 +226,18 @@ class OutfitManager {
     }
 
     // 保存穿搭
-    saveOutfit() {
+    async saveOutfit() {
         // 检查是否有至少一件衣服
         const hasClothes = Object.values(this.currentOutfit).some(clothId => clothId !== null);
         if (!hasClothes) {
             alert('请至少选择一件衣服');
             return;
+        }
+        
+        // AI 颜色搭配检查
+        const colorCheckPassed = await this.checkColorMatching();
+        if (!colorCheckPassed) {
+            return; // 用户取消保存
         }
         
         // 获取穿搭名称
@@ -243,7 +254,7 @@ class OutfitManager {
         };
         
         // 保存到本地存储
-        if (storage.addOutfit(outfit)) {
+        if (await storage.addOutfit(outfit)) {
             this.outfits.push(outfit);
             this.renderOutfits();
             alert('穿搭保存成功！');
@@ -252,23 +263,52 @@ class OutfitManager {
         }
     }
 
-    // 生成随机穿搭
-    generateRandomOutfit() {
-        const clothes = storage.getClothes();
+    // 生成随机穿搭（智能版）
+    async generateRandomOutfit() {
+        const clothes = await storage.getClothes();
         if (clothes.length === 0) {
             alert('你的衣柜还是空的，无法生成随机穿搭');
             return;
         }
         
-        // 按分类分组
-        const clothesByCategory = {
-            top: clothes.filter(cloth => cloth.category === 'top'),
-            pants: clothes.filter(cloth => cloth.category === 'pants'),
-            shoes: clothes.filter(cloth => cloth.category === 'shoes'),
-            accessory: clothes.filter(cloth => cloth.category === 'accessory')
+        // 获取当前季节
+        const currentSeason = this.getCurrentSeason();
+        
+        // 按分类和季节过滤
+        const filterBySeason = (clothList) => {
+            return clothList.filter(cloth => 
+                cloth.season === currentSeason || cloth.season === 'all'
+            );
         };
         
-        // 随机选择每个分类的衣服（如果有的话）
+        const clothesByCategory = {
+            top: filterBySeason(clothes.filter(cloth => cloth.category === 'top')),
+            pants: filterBySeason(clothes.filter(cloth => cloth.category === 'pants')),
+            shoes: filterBySeason(clothes.filter(cloth => cloth.category === 'shoes')),
+            accessory: filterBySeason(clothes.filter(cloth => cloth.category === 'accessory'))
+        };
+        
+        // 检查是否有适合当前季节的衣服
+        const hasSeasonalClothes = Object.values(clothesByCategory).some(arr => arr.length > 0);
+        
+        if (!hasSeasonalClothes) {
+            const confirm = window.confirm(
+                `没有找到适合${this.getSeasonName(currentSeason)}的衣服。\n` +
+                `是否从所有衣服中随机选择？`
+            );
+            
+            if (confirm) {
+                // 使用所有衣服
+                clothesByCategory.top = clothes.filter(cloth => cloth.category === 'top');
+                clothesByCategory.pants = clothes.filter(cloth => cloth.category === 'pants');
+                clothesByCategory.shoes = clothes.filter(cloth => cloth.category === 'shoes');
+                clothesByCategory.accessory = clothes.filter(cloth => cloth.category === 'accessory');
+            } else {
+                return;
+            }
+        }
+        
+        // 随机选择每个分类的衣服
         this.currentOutfit = {
             top: clothesByCategory.top.length > 0 
                 ? clothesByCategory.top[Math.floor(Math.random() * clothesByCategory.top.length)].id 
@@ -285,8 +325,135 @@ class OutfitManager {
         };
         
         this.updateOutfitDisplay();
+        
+        // 震动反馈
+        if (navigator.vibrate) {
+            navigator.vibrate([50, 100, 50]);
+        }
     }
 
+    // AI 颜色搭配检查
+    async checkColorMatching() {
+        const clothes = [];
+        const colors = [];
+        
+        // 收集当前穿搭的衣服颜色
+        for (const [category, clothId] of Object.entries(this.currentOutfit)) {
+            if (clothId) {
+                const cloth = await storage.getClothById(clothId);
+                if (cloth && cloth.color && cloth.color !== '未设置') {
+                    clothes.push({ category, cloth });
+                    colors.push(cloth.color);
+                }
+            }
+        }
+        
+        if (colors.length < 2) return true; // 少于2件不需要检查
+        
+        // 检查颜色冲突
+        let hasConflict = false;
+        let warnings = [];
+        
+        for (let i = 0; i < colors.length - 1; i++) {
+            for (let j = i + 1; j < colors.length; j++) {
+                const conflict = aiHelper.checkColorConflict(colors[i], colors[j]);
+                if (conflict.hasConflict) {
+                    hasConflict = true;
+                    warnings.push(conflict.warning);
+                }
+            }
+        }
+        
+        // 如果有冲突，给出提示
+        if (hasConflict) {
+            const proceed = confirm(
+                '🤖 AI 搭配建议：\n\n' + 
+                warnings.join('\n') + 
+                '\n\n是否仍然保存这套穿搭？'
+            );
+            
+            if (!proceed) {
+                return false;
+            }
+        } else if (colors.length >= 2) {
+            // 没有冲突，给出正面反馈
+            console.log('✅ AI 检测：颜色搭配很和谐！');
+        }
+        
+        return true;
+    }
+    
+    // AI 颜色搭配检查
+    async checkColorMatching() {
+        const clothes = [];
+        const colors = [];
+        
+        // 收集当前穿搭的衣服颜色
+        for (const [category, clothId] of Object.entries(this.currentOutfit)) {
+            if (clothId) {
+                const cloth = storage.getClothById(clothId);
+                if (cloth && cloth.color && cloth.color !== '未设置') {
+                    clothes.push({ category, cloth });
+                    colors.push(cloth.color);
+                }
+            }
+        }
+        
+        if (colors.length < 2) return true; // 少于2件不需要检查
+        
+        // 检查颜色冲突
+        let hasConflict = false;
+        let warnings = [];
+        
+        for (let i = 0; i < colors.length - 1; i++) {
+            for (let j = i + 1; j < colors.length; j++) {
+                const conflict = aiHelper.checkColorConflict(colors[i], colors[j]);
+                if (conflict.hasConflict) {
+                    hasConflict = true;
+                    warnings.push(conflict.warning);
+                }
+            }
+        }
+        
+        // 如果有冲突，给出提示
+        if (hasConflict) {
+            const proceed = confirm(
+                '🤖 AI 搭配建议：\n\n' + 
+                warnings.join('\n') + 
+                '\n\n是否仍然保存这套穿搭？'
+            );
+            
+            return proceed;
+        } else if (colors.length >= 2) {
+            // 没有冲突，给出正面反馈
+            console.log('✅ AI 检测：颜色搭配很和谐！');
+        }
+        
+        return true;
+    }
+    
+    // 获取当前季节
+    getCurrentSeason() {
+        const month = new Date().getMonth() + 1; // 1-12
+        
+        if (month >= 3 && month <= 5) return 'spring';
+        if (month >= 6 && month <= 8) return 'summer';
+        if (month >= 9 && month <= 11) return 'autumn';
+        return 'winter';
+    }
+    
+    // 获取季节中文名称
+    getSeasonName(season) {
+        const seasonNames = {
+            spring: '春季',
+            summer: '夏季',
+            autumn: '秋季',
+            winter: '冬季',
+            all: '四季'
+        };
+        return seasonNames[season] || season;
+    }
+    
     // 获取分类中文名称
     getCategoryName(category) {
         const categoryNames = {

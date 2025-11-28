@@ -38,8 +38,8 @@ class ClosetManager {
     }
 
     // 加载衣服数据
-    loadClothes() {
-        this.clothes = storage.getClothes();
+    async loadClothes() {
+        this.clothes = await storage.getClothes();
         this.renderClothes();
     }
 
@@ -240,8 +240,8 @@ class ClosetManager {
         modal.classList.add('active');
         
         // 删除按钮事件
-        const deleteHandler = () => {
-            if (this.deleteCloth(clothId)) {
+        const deleteHandler = async () => {
+            if (await this.deleteCloth(clothId)) {
                 modal.classList.remove('active');
             }
             deleteBtn.removeEventListener('click', deleteHandler);
@@ -267,8 +267,8 @@ class ClosetManager {
     }
     
     // 删除衣服
-    deleteCloth(clothId) {
-        if (storage.deleteCloth(clothId)) {
+    async deleteCloth(clothId) {
+        if (await storage.deleteCloth(clothId)) {
             document.dispatchEvent(new CustomEvent('clothDeleted', { detail: { clothId: clothId } }));
             return true;
         }

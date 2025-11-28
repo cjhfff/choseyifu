@@ -85,7 +85,7 @@
                 <section id="outfits-page" class="page">
                     <div class="section-header">
                         <h2>我的穿搭</h2>
-                        <button id="random-outfit-btn" class="btn-secondary">随机穿搭</button>
+                        <button id="random-outfit-btn" class="btn-secondary" title="根据当前季节智能推荐">🎲 智能推荐</button>
                     </div>
                     
                     <div class="outfits-grid" id="outfits-grid">
@@ -162,8 +162,8 @@
                         </select>
                     </div>
                     <div class="form-actions">
-                        <button id="save-cloth-btn" class="btn-primary">💾 保存衣服</button>
-                        <button id="quick-save-btn" class="btn-secondary">⚡ 快速保存</button>
+                        <button id="save-cloth-btn" class="btn-primary" title="保存所有信息">💾 完整保存</button>
+                        <button id="quick-save-btn" class="btn-secondary" title="只需名称和分类，快速保存">⚡ 快速保存</button>
                     </div>
                 </div>
             </div>
@@ -186,6 +186,7 @@
 
     <!-- JavaScript 文件 -->
     <script src="js/storage.js"></script>
+    <script src="js/ai-helper.js"></script>
     <script src="js/camera.js"></script>
     <script src="js/closet.js"></script>
     <script src="js/outfit.js"></script>

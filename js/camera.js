@@ -125,7 +125,7 @@ class CameraManager {
             this.capturedImage = await this.compressImage(originalImage);
             
             // 显示预览
-            this.showPreview();
+            await this.showPreview();
             
         } catch (error) {
             console.error('Error capturing photo:', error);
@@ -254,7 +254,7 @@ class CameraManager {
             this.capturedImage = await this.compressImage(e.target.result);
             // 打开模态框并显示预览
             this.cameraModal.classList.add('active');
-            this.showPreview();
+            await this.showPreview();
         };
         reader.readAsDataURL(file);
         
@@ -303,14 +303,14 @@ class CameraManager {
     }
     
     // 保存衣服
-    saveCloth() {
+    async saveCloth() {
         if (!this.capturedImage) {
             alert('请先拍摄照片');
             return;
         }
         
         // 检查存储空间
-        this.checkStorageSpace();
+        await this.checkStorageSpace();
         
         // 获取表单数据
         const name = document.getElementById('cloth-name').value.trim();
@@ -408,18 +408,17 @@ class CameraManager {
     }
     
     // 检查存储空间
-    checkStorageSpace() {
+    async checkStorageSpace() {
         try {
-            const used = new Blob(Object.values(localStorage)).size;
-            const limit = 5 * 1024 * 1024; // 5MB
-            const usedMB = (used / 1024 / 1024).toFixed(2);
-            const percentage = ((used / limit) * 100).toFixed(1);
+            const info = await storage.getStorageInfo();
+            const usedMB = info.usedMB;
+            const percentage = info.percentage;
             
             if (percentage > 80) {
                 alert(`⚠️ 存储空间即将用完！\n已使用: ${usedMB}MB (${percentage}%)\n建议删除一些不常穿的衣服`);
             }
             
-            return { used, limit, percentage };
+            return info;
         } catch (e) {
             console.error('无法检查存储空间:', e);
             return null;

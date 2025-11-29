@@ -1,0 +1,79 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <title>快速诊断</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1e1e1e; color: #d4d4d4; }
+        .ok { color: #4ec9b0; }
+        .error { color: #f48771; }
+        .warn { color: #dcdcaa; }
+    </style>
+</head>
+<body>
+    <h2>🔍 快速诊断工具</h2>
+    <div id="log"></div>
+
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <script>
+        const log = document.getElementById('log');
+        
+        function print(msg, type = 'ok') {
+            log.innerHTML += `<div class="${type}">${msg}</div>`;
+            console.log(msg);
+        }
+        
+        setTimeout(async () => {
+            print('=== 开始诊断 ===');
+            
+            // 1. SDK 检查
+            if (window.supabase) {
+                print('✅ Supabase SDK 已加载');
+            } else {
+                print('❌ Supabase SDK 未加载', 'error');
+                return;
+            }
+            
+            // 2. 创建客户端
+            let client;
+            try {
+                client = window.supabase.createClient(
+                    'https://zffopygwvczaeixfxzzm.supabase.co',
+                    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InpmZm9weWd3dmN6YWVpeGZ4enptIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjQzNjcxODIsImV4cCI6MjA3OTk0MzE4Mn0.x_qj6ebWq1oXmLTmsjUo57yPNgtHs-BB5fKceoO891s'
+                );
+                print('✅ Supabase 客户端创建成功');
+            } catch (e) {
+                print('❌ 客户端创建失败: ' + e.message, 'error');
+                return;
+            }
+            
+            // 3. 测试数据库连接
+            try {
+                const { data, error } = await client.from('clothes').select('*').limit(1);
+                if (error) throw error;
+                print('✅ 数据库连接成功，找到 ' + (data?.length || 0) + ' 条记录');
+            } catch (e) {
+                print('❌ 数据库连接失败: ' + e.message, 'error');
+                print('⚠️  请确认已在 Supabase 创建 clothes 表', 'warn');
+            }
+            
+            // 4. 测试 Bucket
+            try {
+                const { data, error } = await client.storage.getBucket('cloth-images');
+                if (error) throw error;
+                print('✅ Storage Bucket "cloth-images" 存在');
+            } catch (e) {
+                print('❌ Bucket 不存在: ' + e.message, 'error');
+                print('⚠️  请在 Supabase Storage 创建 cloth-images bucket', 'warn');
+            }
+            
+            print('\n=== 诊断完成 ===');
+            print('\n📋 下一步操作：');
+            print('1. 如果数据库连接失败，请运行 SUPABASE_QUICKSTART.md 中的 SQL');
+            print('2. 如果 Bucket 不存在，请在 Supabase Dashboard 创建');
+            print('3. 所有测试通过后，刷新主应用即可正常使用');
+        }, 1000);
+    </script>
+</body>
+</html>

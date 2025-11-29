@@ -38,14 +38,15 @@ class App {
     }
     
     // 显示存储空间信息
-    displayStorageInfo() {
+    async displayStorageInfo() {
         try {
-            const used = new Blob(Object.values(localStorage)).size;
-            const limit = 5 * 1024 * 1024; // 5MB
-            const usedMB = (used / 1024 / 1024).toFixed(2);
-            const percentage = ((used / limit) * 100).toFixed(1);
+            const info = await storage.getStorageInfo();
+            const usedMB = info.usedMB;
+            const limitMB = info.limitMB;
+            const percentage = info.percentage;
             
-            console.log(`📊 存储空间使用情况：${usedMB}MB / 5MB (${percentage}%)`);
+            console.log(`📊 存储空间使用情况：${usedMB}MB / ${limitMB} (${percentage}%)`);
+            console.log(`☁️ 云端存储：${info.clothesCount} 件衣服，${info.outfitsCount} 套穿搭`);
             
             // 如果使用超过50%，在控制台提示
             if (percentage > 50) {

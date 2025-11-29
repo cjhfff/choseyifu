@@ -411,13 +411,11 @@ class CameraManager {
     async checkStorageSpace() {
         try {
             const info = await storage.getStorageInfo();
-            const usedMB = info.usedMB;
-            const percentage = info.percentage;
-            
-            if (percentage > 80) {
-                alert(`⚠️ 存储空间即将用完！\n已使用: ${usedMB}MB (${percentage}%)\n建议删除一些不常穿的衣服`);
+            // 云端存储不需要警告（容量充足）
+            if (!info.isCloud && info.percentage > 80) {
+                alert(`⚠️ 存储空间即将用完！\n已使用: ${info.usedMB}MB (${info.percentage}%)\n建议删除一些不常穿的衣服`);
             }
-            
+            console.log('📊 存储信息:', info);
             return info;
         } catch (e) {
             console.error('无法检查存储空间:', e);

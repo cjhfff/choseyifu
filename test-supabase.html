@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Supabase 连接测试</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            max-width: 800px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .test-card {
+            background: white;
+            padding: 20px;
+            margin: 10px 0;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .test-card h3 {
+            margin-top: 0;
+            color: #333;
+        }
+        .status {
+            display: inline-block;
+            padding: 5px 10px;
+            border-radius: 4px;
+            font-size: 14px;
+            font-weight: bold;
+        }
+        .success { background: #4caf50; color: white; }
+        .error { background: #f44336; color: white; }
+        .warning { background: #ff9800; color: white; }
+        .pending { background: #2196f3; color: white; }
+        pre {
+            background: #f5f5f5;
+            padding: 10px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #2196f3;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:hover {
+            background: #1976d2;
+        }
+    </style>
+</head>
+<body>
+    <h1>☁️ Supabase 连接测试</h1>
+    
+    <div class="test-card">
+        <h3>1. Supabase SDK 加载</h3>
+        <div id="sdk-status" class="status pending">检查中...</div>
+        <pre id="sdk-info"></pre>
+    </div>
+    
+    <div class="test-card">
+        <h3>2. Storage 模块初始化</h3>
+        <div id="storage-status" class="status pending">检查中...</div>
+        <pre id="storage-info"></pre>
+    </div>
+    
+    <div class="test-card">
+        <h3>3. 数据库连接测试</h3>
+        <div id="db-status" class="status pending">等待测试...</div>
+        <button onclick="testDatabase()">测试数据库</button>
+        <pre id="db-info"></pre>
+    </div>
+    
+    <div class="test-card">
+        <h3>4. Storage Bucket 测试</h3>
+        <div id="bucket-status" class="status pending">等待测试...</div>
+        <button onclick="testBucket()">测试 Bucket</button>
+        <pre id="bucket-info"></pre>
+    </div>
+    
+    <div class="test-card">
+        <h3>5. 获取存储信息</h3>
+        <div id="info-status" class="status pending">等待测试...</div>
+        <button onclick="testGetInfo()">测试 getStorageInfo</button>
+        <pre id="info-result"></pre>
+    </div>
+
+    <!-- 引入 Supabase SDK -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    
+    <!-- 引入 storage.js -->
+    <script src="js/storage.js"></script>
+    
+    <script>
+        // 测试 1: SDK 加载
+        setTimeout(() => {
+            const sdkStatus = document.getElementById('sdk-status');
+            const sdkInfo = document.getElementById('sdk-info');
+            
+            if (typeof window.supabase !== 'undefined') {
+                sdkStatus.className = 'status success';
+                sdkStatus.textContent = '✅ 加载成功';
+                sdkInfo.textContent = 'Supabase SDK 版本: ' + (window.supabase.version || '2.x');
+            } else {
+                sdkStatus.className = 'status error';
+                sdkStatus.textContent = '❌ 加载失败';
+                sdkInfo.textContent = 'Supabase SDK 未找到';
+            }
+        }, 1000);
+        
+        // 测试 2: Storage 模块
+        setTimeout(() => {
+            const storageStatus = document.getElementById('storage-status');
+            const storageInfo = document.getElementById('storage-info');
+            
+            if (typeof storage !== 'undefined') {
+                storageStatus.className = 'status success';
+                storageStatus.textContent = '✅ 初始化成功';
+                storageInfo.textContent = JSON.stringify({
+                    bucketName: storage.bucketName,
+                    tableName: storage.tableName,
+                    outfitsTableName: storage.outfitsTableName
+                }, null, 2);
+            } else {
+                storageStatus.className = 'status error';
+                storageStatus.textContent = '❌ 初始化失败';
+                storageInfo.textContent = 'storage 对象未找到';
+            }
+        }, 1500);
+        
+        // 测试 3: 数据库连接
+        async function testDatabase() {
+            const dbStatus = document.getElementById('db-status');
+            const dbInfo = document.getElementById('db-info');
+            
+            dbStatus.className = 'status pending';
+            dbStatus.textContent = '⏳ 测试中...';
+            
+            try {
+                const { data, error } = await supabase
+                    .from('clothes')
+                    .select('count', { count: 'exact', head: true });
+                
+                if (error) throw error;
+                
+                dbStatus.className = 'status success';
+                dbStatus.textContent = '✅ 连接成功';
+                dbInfo.textContent = '数据库表 "clothes" 存在且可访问\n' + 
+                                    '当前记录数: ' + (data?.length || 0);
+            } catch (error) {
+                dbStatus.className = 'status error';
+                dbStatus.textContent = '❌ 连接失败';
+                dbInfo.textContent = '错误信息:\n' + JSON.stringify(error, null, 2) + 
+                                    '\n\n可能原因:\n' +
+                                    '1. 表 "clothes" 不存在\n' +
+                                    '2. RLS 策略未配置\n' +
+                                    '3. API Key 错误';
+            }
+        }
+        
+        // 测试 4: Storage Bucket
+        async function testBucket() {
+            const bucketStatus = document.getElementById('bucket-status');
+            const bucketInfo = document.getElementById('bucket-info');
+            
+            bucketStatus.className = 'status pending';
+            bucketStatus.textContent = '⏳ 测试中...';
+            
+            try {
+                const { data, error } = await supabase
+                    .storage
+                    .getBucket('cloth-images');
+                
+                if (error) throw error;
+                
+                bucketStatus.className = 'status success';
+                bucketStatus.textContent = '✅ Bucket 存在';
+                bucketInfo.textContent = 'Bucket 信息:\n' + JSON.stringify(data, null, 2);
+            } catch (error) {
+                bucketStatus.className = 'status error';
+                bucketStatus.textContent = '❌ Bucket 不存在';
+                bucketInfo.textContent = '错误信息:\n' + JSON.stringify(error, null, 2) + 
+                                       '\n\n请在 Supabase Dashboard 创建名为 "cloth-images" 的 Bucket';
+            }
+        }
+        
+        // 测试 5: getStorageInfo
+        async function testGetInfo() {
+            const infoStatus = document.getElementById('info-status');
+            const infoResult = document.getElementById('info-result');
+            
+            infoStatus.className = 'status pending';
+            infoStatus.textContent = '⏳ 测试中...';
+            
+            try {
+                const info = await storage.getStorageInfo();
+                
+                infoStatus.className = 'status success';
+                infoStatus.textContent = '✅ 获取成功';
+                infoResult.textContent = JSON.stringify(info, null, 2);
+            } catch (error) {
+                infoStatus.className = 'status error';
+                infoStatus.textContent = '❌ 获取失败';
+                infoResult.textContent = '错误信息:\n' + error.message + '\n' + error.stack;
+            }
+        }
+        
+        // 自动运行基础测试
+        console.log('🧪 开始自动测试...');
+    </script>
+</body>
+</html>

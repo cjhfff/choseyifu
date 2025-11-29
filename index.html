@@ -187,6 +187,19 @@
     <!-- Supabase SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     
+    <!-- 等待 Supabase SDK 加载完成 -->
+    <script>
+        // 确保 Supabase SDK 加载完成后再初始化应用
+        window.addEventListener('load', function() {
+            if (!window.supabase) {
+                console.error('❌ Supabase SDK 加载失败！');
+                alert('网络连接问题，请刷新页面重试');
+            } else {
+                console.log('✅ Supabase SDK 已加载');
+            }
+        });
+    </script>
+    
     <!-- JavaScript 文件 -->
     <script src="js/storage.js"></script>
     <script src="js/ai-helper.js"></script>

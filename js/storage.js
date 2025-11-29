@@ -19,7 +19,7 @@ function initSupabase() {
 
 class StorageManager {
     constructor() {
-        this.bucketName = 'cloth-images';
+        this.bucketName = 'CLOTH-IMAGES';  // 使用大写，匹配 Supabase 中的 bucket 名称
         this.tableName = 'clothes';
         this.outfitsTableName = 'outfits';
         console.log('☁️ Supabase 云端存储已初始化');

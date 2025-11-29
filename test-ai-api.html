@@ -1,0 +1,469 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI 接口诊断工具</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            padding: 40px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .subtitle {
+            color: #666;
+            margin-bottom: 30px;
+            font-size: 14px;
+        }
+        .test-section {
+            margin: 30px 0;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border-left: 4px solid #667eea;
+        }
+        .test-title {
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 15px;
+            font-size: 16px;
+        }
+        .status {
+            padding: 10px 15px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+        .status.pending {
+            background: #fff3cd;
+            color: #856404;
+        }
+        .status.success {
+            background: #d4edda;
+            color: #155724;
+        }
+        .status.error {
+            background: #f8d7da;
+            color: #721c24;
+        }
+        .status.info {
+            background: #d1ecf1;
+            color: #0c5460;
+        }
+        button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 10px 5px;
+        }
+        button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 20px rgba(102, 126, 234, 0.4);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .image-upload {
+            margin: 20px 0;
+        }
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 10px;
+            padding: 40px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .upload-area:hover {
+            background: #f8f9ff;
+            border-color: #764ba2;
+        }
+        .preview-image {
+            max-width: 200px;
+            max-height: 200px;
+            margin: 20px auto;
+            display: block;
+            border-radius: 10px;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+        pre {
+            background: #2d3748;
+            color: #68d391;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            font-size: 12px;
+            max-height: 300px;
+        }
+        .solution {
+            background: #e7f3ff;
+            border-left: 4px solid #2196F3;
+            padding: 20px;
+            margin: 20px 0;
+            border-radius: 5px;
+        }
+        .solution h3 {
+            color: #1976D2;
+            margin-bottom: 10px;
+        }
+        .solution ol {
+            margin-left: 20px;
+            color: #333;
+        }
+        .solution li {
+            margin: 10px 0;
+            line-height: 1.6;
+        }
+        .solution code {
+            background: #f5f5f5;
+            padding: 2px 6px;
+            border-radius: 3px;
+            color: #d73a49;
+            font-family: 'Courier New', monospace;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔧 AI 接口诊断工具</h1>
+        <p class="subtitle">检测你的 AI 识别接口是否正常工作</p>
+
+        <!-- 测试1: 环境检测 -->
+        <div class="test-section">
+            <div class="test-title">📋 步骤 1: 环境检测</div>
+            <div id="env-status" class="status pending">等待检测...</div>
+            <button onclick="checkEnvironment()">开始检测</button>
+        </div>
+
+        <!-- 测试2: API 连通性 -->
+        <div class="test-section">
+            <div class="test-title">🌐 步骤 2: API 连通性测试</div>
+            <div id="api-status" class="status pending">等待测试...</div>
+            <button onclick="testAPIConnection()">测试连接</button>
+        </div>
+
+        <!-- 测试3: 实际图片分析 -->
+        <div class="test-section">
+            <div class="test-title">🖼️ 步骤 3: 实际图片识别测试</div>
+            <div class="image-upload">
+                <div class="upload-area" onclick="document.getElementById('imageInput').click()">
+                    <p>📸 点击上传测试图片</p>
+                    <p style="font-size: 12px; color: #999; margin-top: 10px;">支持拍照或选择衣物图片</p>
+                </div>
+                <input type="file" id="imageInput" accept="image/*" capture="environment" style="display:none;" onchange="handleImageUpload(event)">
+                <img id="preview" class="preview-image" style="display:none;">
+            </div>
+            <div id="test-status" class="status pending">请先上传图片</div>
+            <button id="testBtn" onclick="testImageAnalysis()" disabled>开始识别</button>
+        </div>
+
+        <!-- 结果展示 -->
+        <div class="test-section" id="resultSection" style="display:none;">
+            <div class="test-title">📊 识别结果</div>
+            <pre id="resultJson"></pre>
+        </div>
+
+        <!-- 解决方案 -->
+        <div class="solution" id="solutionSection" style="display:none;">
+            <h3>💡 解决方案</h3>
+            <div id="solutionContent"></div>
+        </div>
+    </div>
+
+    <script>
+        let currentImage = null;
+
+        // 步骤1: 环境检测
+        function checkEnvironment() {
+            const statusDiv = document.getElementById('env-status');
+            statusDiv.className = 'status pending';
+            statusDiv.innerHTML = '🔍 正在检测环境...';
+
+            setTimeout(() => {
+                const results = [];
+                
+                // 检测当前 URL
+                const currentURL = window.location.href;
+                const isLocal = currentURL.includes('localhost') || currentURL.includes('127.0.0.1') || currentURL.includes('file://');
+                const isVercel = currentURL.includes('vercel.app');
+                
+                results.push(`当前访问地址: ${currentURL}`);
+                results.push(`运行环境: ${isLocal ? '❌ 本地环境（API 不可用）' : isVercel ? '✅ Vercel 部署环境' : '⚠️ 其他服务器'}`);
+                
+                // 检测浏览器支持
+                const hasCamera = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
+                results.push(`相机支持: ${hasCamera ? '✅ 支持' : '❌ 不支持'}`);
+                
+                const hasFetch = typeof fetch !== 'undefined';
+                results.push(`Fetch API: ${hasFetch ? '✅ 支持' : '❌ 不支持'}`);
+
+                if (isLocal) {
+                    statusDiv.className = 'status error';
+                    statusDiv.innerHTML = `
+                        <strong>❌ 检测到本地环境</strong><br>
+                        ${results.join('<br>')}
+                        <br><br>
+                        <strong>问题：</strong>AI 接口需要部署到 Vercel 才能工作！
+                    `;
+                    showSolution('local');
+                } else if (isVercel) {
+                    statusDiv.className = 'status success';
+                    statusDiv.innerHTML = `
+                        <strong>✅ 环境检测通过</strong><br>
+                        ${results.join('<br>')}
+                    `;
+                } else {
+                    statusDiv.className = 'status info';
+                    statusDiv.innerHTML = `
+                        <strong>⚠️ 未知部署环境</strong><br>
+                        ${results.join('<br>')}
+                    `;
+                }
+            }, 500);
+        }
+
+        // 步骤2: API 连通性测试
+        async function testAPIConnection() {
+            const statusDiv = document.getElementById('api-status');
+            statusDiv.className = 'status pending';
+            statusDiv.innerHTML = '🔍 正在测试 API 连接...';
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg=='
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const data = await response.json();
+                
+                if (data.error) {
+                    throw new Error(data.error);
+                }
+
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = `
+                    <strong>✅ API 连接成功！</strong><br>
+                    接口响应正常，可以进行图片识别测试
+                `;
+
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <strong>❌ API 连接失败</strong><br>
+                    错误信息: ${error.message}<br>
+                    <br>
+                    可能的原因：<br>
+                    1. 未部署到 Vercel<br>
+                    2. API Key 未配置<br>
+                    3. 网络连接问题
+                `;
+                showSolution('api-failed');
+            }
+        }
+
+        // 处理图片上传
+        function handleImageUpload(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                currentImage = e.target.result;
+                const preview = document.getElementById('preview');
+                preview.src = currentImage;
+                preview.style.display = 'block';
+                
+                document.getElementById('testBtn').disabled = false;
+                document.getElementById('test-status').className = 'status info';
+                document.getElementById('test-status').innerHTML = '✅ 图片已加载，点击"开始识别"进行测试';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        // 步骤3: 实际图片分析测试
+        async function testImageAnalysis() {
+            if (!currentImage) {
+                alert('请先上传图片！');
+                return;
+            }
+
+            const statusDiv = document.getElementById('test-status');
+            const resultSection = document.getElementById('resultSection');
+            const resultJson = document.getElementById('resultJson');
+            const testBtn = document.getElementById('testBtn');
+
+            statusDiv.className = 'status pending';
+            statusDiv.innerHTML = '🤖 正在分析图片，请稍候...';
+            testBtn.disabled = true;
+
+            try {
+                const response = await fetch('/api/analyze', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        image: currentImage
+                    })
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                }
+
+                const result = await response.json();
+                
+                if (result.error) {
+                    throw new Error(result.error);
+                }
+
+                // 显示成功结果
+                statusDiv.className = 'status success';
+                statusDiv.innerHTML = `
+                    <strong>✅ 识别成功！</strong><br>
+                    颜色: ${result.color || '未知'} (${result.colorHex || ''})<br>
+                    类型: ${getCategoryName(result.category)}<br>
+                    置信度: ${(result.confidence * 100).toFixed(1)}%<br>
+                    季节: ${getSeasonName(result.suggestedSeason)}
+                `;
+
+                // 显示完整 JSON
+                resultSection.style.display = 'block';
+                resultJson.textContent = JSON.stringify(result, null, 2);
+
+                testBtn.disabled = false;
+
+            } catch (error) {
+                statusDiv.className = 'status error';
+                statusDiv.innerHTML = `
+                    <strong>❌ 识别失败</strong><br>
+                    错误信息: ${error.message}
+                `;
+                showSolution('analysis-failed');
+                testBtn.disabled = false;
+            }
+        }
+
+        // 显示解决方案
+        function showSolution(type) {
+            const solutionSection = document.getElementById('solutionSection');
+            const solutionContent = document.getElementById('solutionContent');
+            
+            solutionSection.style.display = 'block';
+
+            if (type === 'local') {
+                solutionContent.innerHTML = `
+                    <ol>
+                        <li><strong>部署到 Vercel：</strong>
+                            <ul>
+                                <li>访问 <a href="https://vercel.com" target="_blank">vercel.com</a> 并登录</li>
+                                <li>点击 "New Project" → 导入你的 GitHub 仓库</li>
+                                <li>点击 Deploy 完成部署</li>
+                            </ul>
+                        </li>
+                        <li><strong>配置 API Key：</strong>
+                            <ul>
+                                <li>在 Vercel 项目设置中找到 "Environment Variables"</li>
+                                <li>添加变量: <code>SILICON_FLOW_API_KEY</code></li>
+                                <li>值为: <code>sk-gocqsbrafyqklzgiwmasvmonueucwlropzngfmfosfrodtjl</code></li>
+                                <li>保存后重新部署</li>
+                            </ul>
+                        </li>
+                        <li><strong>本地测试（可选）：</strong>
+                            <ul>
+                                <li>安装 Vercel CLI: <code>npm i -g vercel</code></li>
+                                <li>在项目目录运行: <code>vercel dev</code></li>
+                                <li>访问 <code>http://localhost:3000</code></li>
+                            </ul>
+                        </li>
+                    </ol>
+                `;
+            } else if (type === 'api-failed') {
+                solutionContent.innerHTML = `
+                    <ol>
+                        <li>检查是否已在 Vercel 配置环境变量 <code>SILICON_FLOW_API_KEY</code></li>
+                        <li>确认项目已成功部署到 Vercel</li>
+                        <li>查看 Vercel 部署日志是否有错误</li>
+                        <li>尝试在 Vercel 重新部署项目</li>
+                        <li>检查 API Key 是否有效（可能已过期或额度用完）</li>
+                    </ol>
+                `;
+            } else if (type === 'analysis-failed') {
+                solutionContent.innerHTML = `
+                    <ol>
+                        <li>确认图片格式正确（支持 JPG、PNG）</li>
+                        <li>图片大小不要超过 5MB</li>
+                        <li>检查网络连接是否正常</li>
+                        <li>查看浏览器控制台是否有详细错误信息</li>
+                        <li>如果是 API 配额问题，可能需要等待或更换 API Key</li>
+                    </ol>
+                `;
+            }
+        }
+
+        // 辅助函数
+        function getCategoryName(category) {
+            const names = {
+                'top': '上衣',
+                'pants': '裤装',
+                'shoes': '鞋子',
+                'accessory': '配饰'
+            };
+            return names[category] || category;
+        }
+
+        function getSeasonName(season) {
+            const names = {
+                'spring': '春季',
+                'summer': '夏季',
+                'autumn': '秋季',
+                'winter': '冬季',
+                'all': '四季'
+            };
+            return names[season] || season;
+        }
+
+        // 页面加载时自动运行环境检测
+        window.addEventListener('load', () => {
+            setTimeout(checkEnvironment, 500);
+        });
+    </script>
+</body>
+</html>

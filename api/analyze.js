@@ -6,9 +6,16 @@ export const config = {
 };
 
 export default async function handler(request) {
-    // 1. 安全检查：只允许 POST 请求
+    const corsHeaders = {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Methods': 'POST, OPTIONS',
+        'Access-Control-Allow-Headers': 'Content-Type, Authorization'
+    };
+    if (request.method === 'OPTIONS') {
+        return new Response(null, { status: 204, headers: corsHeaders });
+    }
     if (request.method !== 'POST') {
-        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405 });
+        return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: corsHeaders });
     }
 
     try {
@@ -45,8 +52,10 @@ export default async function handler(request) {
         `;
 
         // 4. 调用硅基流动 (SiliconFlow) API
-        // 注意：从环境变量获取 API Key，保证安全
-        const API_KEY = process.env.SILICON_FLOW_API_KEY || 'sk-gocqsbrafyqklzgiwmasvmonueucwlropzngfmfosfrodtjl'; 
+        const API_KEY = process.env.SILICON_FLOW_API_KEY;
+        if (!API_KEY) {
+            return new Response(JSON.stringify({ error: 'Missing SILICON_FLOW_API_KEY' }), { status: 500, headers: corsHeaders });
+        }
         
         const response = await fetch('https://api.siliconflow.cn/v1/chat/completions', {
             method: 'POST',
@@ -55,7 +64,7 @@ export default async function handler(request) {
                 'Authorization': `Bearer ${API_KEY}`
             },
             body: JSON.stringify({
-                model: "Qwen/Qwen2-VL-7B-Instruct", // 免费且强大的视觉模型
+                model: "Qwen/Qwen3-VL-8B-Instruct", // 免费且强大的视觉模型
                 messages: [
                     {
                         role: "user",
@@ -76,21 +85,33 @@ export default async function handler(request) {
             })
         });
 
+        if (!response.ok) {
+            const errText = await response.text();
+            throw new Error(`SiliconFlow ${response.status}: ${errText}`);
+        }
         const data = await response.json();
 
         // 5. 处理返回结果
         if (data.choices && data.choices[0].message) {
             let content = data.choices[0].message.content;
-            // 清理 markdown 标记
+            if (Array.isArray(content)) {
+                content = content.map((part) => {
+                    if (typeof part === 'string') return part;
+                    if (part && typeof part.text === 'string') return part.text;
+                    return '';
+                }).join('\n');
+            }
+            content = String(content);
             content = content.replace(/```json/g, '').replace(/```/g, '').trim();
-            
-            // 验证 JSON 格式
-            const result = JSON.parse(content);
-            
+            const match = content.match(/\{[\s\S]*\}/);
+            if (!match) {
+                throw new Error('No JSON content in model response');
+            }
+            const result = JSON.parse(match[0]);
             return new Response(JSON.stringify(result), {
                 headers: { 
                     'Content-Type': 'application/json',
-                    'Access-Control-Allow-Origin': '*' // 允许跨域
+                    ...corsHeaders
                 }
             });
         } else {
@@ -104,7 +125,7 @@ export default async function handler(request) {
             message: error.message 
         }), { 
             status: 500,
-            headers: { 'Content-Type': 'application/json' }
+            headers: { 'Content-Type': 'application/json', ...corsHeaders }
         });
     }
 }

@@ -201,6 +201,47 @@
     <script>
         let currentImage = null;
 
+        function detectEnvironment() {
+            const url = new URL(window.location.href);
+            const host = url.hostname;
+            const protocol = url.protocol;
+            const isFile = protocol === 'file:';
+            const isLocalhost = ['localhost', '127.0.0.1'].includes(host);
+            const isVercel = host.endsWith('.vercel.app');
+            const isPreview = isVercel && host.includes('-git-');
+            const isCustomDomain = !isFile && !isLocalhost && !isVercel && protocol.startsWith('http');
+
+            let environmentLabel = '⚠️ 未知部署环境';
+            let nextStep = '';
+            if (isFile) {
+                environmentLabel = '❌ 本地文件模式（file://）';
+                nextStep = '请使用 vercel dev 或部署到 Vercel 后再访问本页面。';
+            } else if (isLocalhost) {
+                environmentLabel = '⚠️ 本地服务器（localhost）';
+                nextStep = '确保是通过 vercel dev 或具备 /api 路由的本地服务启动。';
+            } else if (isVercel) {
+                environmentLabel = isPreview ? '✅ Vercel 预览部署' : '✅ Vercel 生产部署';
+                nextStep = isPreview ? '如需正式域名访问，可在 Vercel 中 Promote 到 Production。' : '环境正确，可继续测试 API。';
+            } else if (isCustomDomain) {
+                environmentLabel = '⚠️ 自定义域名';
+                nextStep = '确认域名已绑定到 Vercel 项目，且此文件包含在部署包内。';
+            }
+
+            return {
+                url: url.href,
+                host,
+                protocol,
+                path: url.pathname,
+                isFile,
+                isLocalhost,
+                isVercel,
+                isPreview,
+                isCustomDomain,
+                environmentLabel,
+                nextStep
+            };
+        }
+
         // 步骤1: 环境检测
         function checkEnvironment() {
             const statusDiv = document.getElementById('env-status');
@@ -208,15 +249,13 @@
             statusDiv.innerHTML = '🔍 正在检测环境...';
 
             setTimeout(() => {
+                const env = detectEnvironment();
                 const results = [];
-                
-                // 检测当前 URL
-                const currentURL = window.location.href;
-                const isLocal = currentURL.includes('localhost') || currentURL.includes('127.0.0.1') || currentURL.includes('file://');
-                const isVercel = currentURL.includes('vercel.app');
-                
-                results.push(`当前访问地址: ${currentURL}`);
-                results.push(`运行环境: ${isLocal ? '❌ 本地环境（API 不可用）' : isVercel ? '✅ Vercel 部署环境' : '⚠️ 其他服务器'}`);
+                results.push(`当前访问地址: ${env.url}`);
+                results.push(`运行环境: ${env.environmentLabel}`);
+                results.push(`协议: ${env.protocol}`);
+                results.push(`主机: ${env.host}`);
+                results.push(`路径: ${env.path}`);
                 
                 // 检测浏览器支持
                 const hasCamera = navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
@@ -225,27 +264,46 @@
                 const hasFetch = typeof fetch !== 'undefined';
                 results.push(`Fetch API: ${hasFetch ? '✅ 支持' : '❌ 不支持'}`);
 
-                if (isLocal) {
+                if (env.isFile) {
                     statusDiv.className = 'status error';
                     statusDiv.innerHTML = `
                         <strong>❌ 检测到本地环境</strong><br>
                         ${results.join('<br>')}
                         <br><br>
                         <strong>问题：</strong>AI 接口需要部署到 Vercel 才能工作！
+                        <br>下一步：${env.nextStep}
                     `;
                     showSolution('local');
-                } else if (isVercel) {
+                } else if (env.isLocalhost) {
+                    statusDiv.className = 'status info';
+                    statusDiv.innerHTML = `
+                        <strong>⚠️ 检测到本地服务器</strong><br>
+                        ${results.join('<br>')}
+                        <br>下一步：${env.nextStep}
+                    `;
+                    showSolution('local');
+                } else if (env.isVercel) {
                     statusDiv.className = 'status success';
                     statusDiv.innerHTML = `
                         <strong>✅ 环境检测通过</strong><br>
                         ${results.join('<br>')}
+                        <br>下一步：${env.nextStep}
                     `;
+                } else if (env.isCustomDomain) {
+                    statusDiv.className = 'status info';
+                    statusDiv.innerHTML = `
+                        <strong>⚠️ 自定义域名</strong><br>
+                        ${results.join('<br>')}
+                        <br>下一步：${env.nextStep}
+                    `;
+                    showSolution('custom');
                 } else {
                     statusDiv.className = 'status info';
                     statusDiv.innerHTML = `
                         <strong>⚠️ 未知部署环境</strong><br>
                         ${results.join('<br>')}
                     `;
+                    showSolution('unknown');
                 }
             }, 500);
         }
@@ -413,6 +471,23 @@
                                 <li>访问 <code>http://localhost:3000</code></li>
                             </ul>
                         </li>
+                    </ol>
+                `;
+            } else if (type === 'custom') {
+                solutionContent.innerHTML = `
+                    <ol>
+                        <li>在 Vercel 控制台确认此自定义域名已经绑定，并指向最新部署</li>
+                        <li>若页面 404，进入 Deployments 页面检查当前部署中是否包含 <code>test-ai-api.html</code></li>
+                        <li>必要时点击 Redeploy → 选择最新 commit（例如 <code>fix ai2</code>）并重新部署</li>
+                        <li>清理浏览器缓存或使用隐私模式重新访问</li>
+                    </ol>
+                `;
+            } else if (type === 'unknown') {
+                solutionContent.innerHTML = `
+                    <ol>
+                        <li>确认访问地址是否正确，如 <code>https://项目名.vercel.app/test-ai-api.html</code></li>
+                        <li>通过 <code>git status</code> 确保最新代码已推送到 GitHub</li>
+                        <li>在 Vercel 中查看 Deployments 记录，确认最新 commit 成功部署</li>
                     </ol>
                 `;
             } else if (type === 'api-failed') {

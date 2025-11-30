@@ -11,8 +11,5 @@
       "src": "/api/(.*)",
       "dest": "/api/$1"
     }
-  ],
-  "env": {
-    "SILICON_FLOW_API_KEY": "@silicon_flow_api_key"
-  }
+  ]
 }
